@@ -37,7 +37,7 @@ if(length($ARGV[0]) != 4 || ! substr($ARGV[0],0,1)=~m/[0-9]/){
 
 $file_fetch = "http://www.rcsb.org/pdb/cgi/export.cgi/$ARGV[0].pdb.gz?format=PDB&pdbId=$ARGV[0]&compression=gz";
 
-`bash -c '/usr/bin/wget -q $file_fetch 2>&1 /dev/null'`;
+`bash -c 'wget -q $file_fetch 2>&1 /dev/null'`;
 if(! -e "$ARGV[0].pdb.gz\?format\=PDB"){
 	print "ERROR: Can't download PDB!\n";
 	exit;
