@@ -1,0 +1,26 @@
+MAKING IT WORK
+
+The following software packages need to be installed on your system in order
+to fully use this script:
+
+1. GROMACS installation. The software GROMACS can be obtained from: 
+   http://www.gromacs.org/Downloads
+   The software needs to be compiled and installed on your system.
+   Depending on what you want to do you can either use single or double 
+   precision, although the latter will most likely cause much longer runtime. 
+   A good instruction is found at:
+   http://www.gromacs.org/Documentation/Installation_Instructions
+   
+   In order to run GROMACS efficiently you need the following additonal
+   packages:
+   - FFTW: http://www.fftw.org/
+   - Some kind of MPI to run GROMACS in parallel - this is REALLY importan
+     otherwise you will have to wait forever until you get reasonable results
+     Your MPI command should either be MPIRUN or MPIEXEC. Otherwise you will 
+     have to change the $call variable within the script.
+   The parallel GROMACS mdrun binary should be called: mdrun_mpi
+   Either add the GROMACS binaries to PATH or define it via the commandline:
+   --gromacsPATH PATH
+
+2. SCWRL i
+
