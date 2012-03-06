@@ -1,0 +1,16 @@
+AGroS is a script package to allow easy setup and run of MD simulation using
+GROMACS. The input is a pdb file or pdb identifier. Single or multiple chain
+proteins are supported. Protein / DNA complexes are still in development. In 
+the future we hope to support different pHs and special ligands.
+
+To analyze the results  we will soon release  GroSA and SAGros, two packages 
+to do stanadard analysis and then subsequently statistical analysis.									      
+									      
+									      
+		     Authors: (C) Marc Offman				      
+			       Date: 05.03.2012 			      
+			       Version: 0.6b				      
+									      
+									      
+			  Thank you for using AGroS!			      
+	    Any questions should be adressed to offman@rostlab.org	      
