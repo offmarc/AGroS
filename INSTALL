@@ -1,4 +1,9 @@
 MAKING IT WORK
+--------------------------------------------------------------------------------
+
+AGroS will use several other scripts deployed in this git repo. Currently, you
+will either need to hardcode the path to the scripts or add them to the PATH 
+environment variable, so they can be called without path.
 
 The following software packages need to be installed on your system in order
 to fully use this script:
@@ -22,5 +27,54 @@ to fully use this script:
    Either add the GROMACS binaries to PATH or define it via the commandline:
    --gromacsPATH PATH
 
-2. SCWRL i
+2. SCWRL installation. This part can be omitted, though doing so might result
+   in missing sidechains. The software must be licensed and can be obtained 
+   from: http://dunbrack.fccc.edu/scwrl4/
+   SCWRL will be called using the following command: "scwrl".
+   Again it either needs to be added to the PATH or be defined via commandline:
+   --scwrlPATH PATH
+   
+3. If you want to fetch PDBs automatically from the PDB database, this will be
+   done using the script fetchpdb. In order to function the command, which is
+   normally installed on any linux system, "wget" needs to be installed. 
+   The same applies to "gunzip" and the shell "bash" should be installed
+   and used.
+   
+These are the commanline options:
+
+USAGE:    AGroS <PDB FILE | PDB CODE> [<CHAIN: ...>] [OPTIONS]
+OPTIONS:  [-dir PATH] 		directory to save results to
+          [-threads int]  	number of processors to use (1)
+          [-noscwrl]      	don't use scwrl
+          [-v]                  verbose and a lot of text
+
+          [-minSteps int]     	steps for minimisation (5000)
+          [-lengthNVPT int]    	time for NVT & NPT in ps (50)
+          [-lengthMD int]     	time for MD in ps (10.000)
+          [-cutoffSTRW int]	cutoff in A for structural water to keep (15)
+
+          [--gromacsPATH PATH] 	path to gromacs distribution
+          [--scwrlPATH PATH]   	path to scwrl distribution
+
+          [--jp] 	        just prepare structure for GROMACS
+
+
+TESTING IT
+--------------------------------------------------------------------------------
+
+A good test case is the PDB '1whz'. You can either use fetchpdb to pull the 
+structure or just call AGroS with this identifier. If you want to run the 
+simulation on two threads (CPUs) the call looks like this:
+
+AGroS 1whz -threads 2
+
+If you do not define a working DIR using "-dir PATH" the standard path will be 
+chosen($HOME/projects/md). 
+
+Finally, if you want to change more specific things such as solvent, boxes, 
+thermostats, barostats or others, you will need to hack the scripts.
+
+GOOD LUCK AND HAVE FUN!
+
+
 
