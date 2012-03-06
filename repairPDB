@@ -1,0 +1,802 @@
+#! /usr/bin/perl -w
+###############
+##   Title   ##
+###############################################################################
+
+my $header = <<'EOHEADER';
+------------------------------------------------------------------------------
+		                  repairPDB		      
+------------------------------------------------------------------------------
+									      
+ repairPDB is a script that should help the user to prepare  PDB for input to
+ other methods.	Some formatting action will be done automatically to overcome
+ typical problems somtimes found in the PDB database. 
+ Using, the commandline different data can be manipulated or extracted.								      
+									      
+									      
+		     Authors: (C) Marc Offman				      
+			       Date: 05.03.2012 			      
+			       Version: 1				      
+									      
+									      
+			  Thank you for using repairPDB!			      
+	    Any questions should be adressed to offman@rostlab.org	      
+									      
+------------------------------------------------------------------------------
+
+EOHEADER
+
+
+if (not defined $ARGV[0]) {
+	&printHelp;
+}
+
+$offset = 0;
+$swChain = 0;
+$swRen = 0;
+$swRenA = 0;
+$swSolv = 0;
+$swHet = 1;
+$swSQRS = 0;
+$swSEQ = 0;
+$swNOH = 0;
+$swcleans = 0;
+$swssw = 0;
+$swDNA = 0;
+$noDNA = 0;
+$noHOH = 0;
+
+
+@slaa = ("A","C","D","E","F","G","H","I","K","L","M","N","P","Q","R","S","T","V","W","Y","B","Z","X","X");
+@tlaa = ("ALA","CYS","ASP","GLU","PHE","GLY","HIS","ILE","LYS","LEU","MET","ASN","PRO","GLN","ARG","SER","THR","VAL","TRP","TYR","ASX","GLX","ACE","UNK");
+%bbatom = ("N"=>1,"CA"=>1,"C"=>1,"O"=>1, "OC1"=>1);
+#%AAatom = ("N"=>1,"CA"=>1,"C"=>1,"O"=>1,"CB"=>1, "CG"=>1, "CG1"=>1, "CG2"=>1, "SG"=>1, "OG"=>1, "OG1"=>1, "CD"=>1, "CD1"=>1, "CD2"=>1, "OD1"=>1,"OD2"=>1, "ND1"=>1, "ND2"=>1, "SD"=>1, "NE"=>1, "NE1"=>1, "NE2"=>1, "SE"=>1, "OE1"=>1, "OE1"=>2, "CE"=>1,"CE1"=>1, "CE2"=>1, "CZ"=>1, "NZ"=>1);
+%myDNA = ("DT"=>1,"DC"=>1,"DG"=>1,"DA"=>1);
+
+for($i = 0; $i < @slaa; $i++){
+	$tto{$tlaa[$i]} = $slaa[$i];
+}
+
+for($i = 0; $i < @ARGV; $i++){
+	$key = $ARGV[$i];
+	$key=~s/\s+//g;
+	$key = lc($key);
+
+	if($key eq "-offset"){
+		if(defined $ARGV[$i+1] && $ARGV[$i+1] =~m/\-??\d+/){
+			$offset = $ARGV[$i+1];
+		}
+		else{
+			print STDERR "offset: value needs to be number!\n";
+			exit(1);
+		}
+	}
+	elsif($key eq "-chain"){
+		if(defined $ARGV[$i+1] && $ARGV[$i+1] =~m/[A-Z,a-z,0-9,\#]/){
+			$swChain = 1;
+			$chain = $ARGV[$i+1];
+		}
+		else{
+			print STDERR "chain: char needs to be single character or digit!\n";
+			exit(1);
+		}				
+	}
+	elsif($key eq "-ratom"){
+		$swRenA = 1;
+	}
+	elsif($key eq "-rres"){
+		$swRen = 1;
+	}
+	elsif($key eq "-jprot"){
+		$swSolv = 1;
+		$swNOH = 1;
+	}
+	elsif($key eq "-het"){
+		$swHet = 0;
+	}
+	elsif($key eq "-h" || $key eq "-help"){
+		&printHelp;
+	}
+	elsif($key =~ m/[a-z,0-9]\:[0-9]+\-[0-9]+/){
+		$key = uc($key);
+		@tmp = split/\:/,$key;
+		$chain = $tmp[0];
+		$s = (split/\-/,$tmp[1])[0];
+		$e = (split/\-/,$tmp[1])[1];
+		if($e < $s){
+			$tmp = $s;
+			$s = $e;
+			$e = $tmp;
+		}
+		$selection{$chain}= "$s-$e";
+		$chains{$chain} = 1;
+	}
+	elsif($key =~m /([a-z,0-9]\:)+/){
+		$key = uc($key);
+		$key =~ s/\://g;
+		$chains{$key} = 1;
+	}
+	elsif($key =~ /[0-9]+\-[0-9]+/){
+		$start = (split/\-/,$key)[0];
+		$end = (split/\-/,$key)[1];
+		if($end < $start){
+			$tmp = $start;
+			$start = $end;
+			$end = $tmp;
+		}
+	}
+	elsif($key eq "-seqrs"){
+		$swSQRS = 1;
+	}
+	elsif($key eq "-seq"){
+		$swSEQ = 1;
+	}
+	elsif($key eq "-noh"){
+		$swNOH = 1;
+	}
+	elsif($key eq "-cleansol"){
+		$swcleans = 1;
+	}
+	elsif($key eq "-ssw"){
+		if(defined $ARGV[$i+1] && $ARGV[$i+1] =~m/\-??\d+/){
+			$bfcutoff = $ARGV[$i+1];
+			$swssw = 1;
+		}
+		else{
+			print STDERR "B-factor cutoff: value needs to be number!\n";
+			exit(1);
+		}
+	}
+	elsif($key eq "-dna"){
+		$swDNA = 1;
+	}
+	elsif($key eq "-nodna"){
+		$noDNA = 1;
+	}
+	elsif($key eq "-nohoh"){
+		$noHOH = 1;
+	}
+}
+if($swcleans + $swSolv + $swssw + $noHOH > 1){
+	&printHelp;
+}
+
+if($swDNA + $noDNA > 1){
+	&printHelp;
+}
+
+if($swSQRS == 1){
+	&getSQRS;
+	exit();
+}
+
+
+$rw = open(FILE,$ARGV[0]);
+if(not defined($rw)) {	
+	die "could not open file: $ARGV[0]\n";
+}
+
+$old = -999999999999;
+$cnt = 0;
+$atomCnt = 1;
+$lastPrint = "";
+$buffer = "";
+$oldRes = -99999999999999999;
+$bbn = 0;
+$oldChain = "";
+
+while(<FILE>){
+	####change tabs to whitespaces####
+	if(/\t+/){
+		1 while s/\t+/' ' x (length($&)*8 - length($`)%8)/e;
+	}
+	####change tabs to whitespaces####
+
+	if(/^ATOM/||/^HETATM/){
+	
+		####get rid of strange residue names####
+		$_=~ s/PCA/ALA/;
+		$_=~ s/PTR/TYR/;
+		$_=~ s/ABA/ALA/;
+		$_=~ s/TYS/TYR/;
+		$_=~ s/HID/HIS/;
+		$_=~ s/HIE/HIS/;
+		$_=~ s/HSE/HIS/;
+		$_=~ s/HIP/HIS/;
+		$_=~ s/ASH/ASP/;
+		$_=~ s/GLH/GLU/;
+		$_=~ s/CYX/CYS/;
+		$_=~ s/MSE/MET/;
+		####get rid of strange residue names####
+				
+		####replace HETATM by ATOM####
+		if($swHet == 1){
+			$resName = substr($_,17,3);
+			#print "|$resName|\n";
+
+			if(defined $tto{$resName}){
+				#print "$_\n";
+				$_ =~s /^HETATM/ATOM  /;
+			}
+		}
+		####replace HETATM by ATOM####
+		
+		#print "|".substr($_,13,3)."|\n";
+		if(substr($_,16,1) ne "B" && substr($_,13,3) ne "OXT" && substr($_,16,4) ne "BHOH" && substr($_,12,4) ne "SE  "){
+			
+			#if alternate water is given remove the prefix of the A marked HOH
+			$_ =~s /AHOH/ HOH/;
+			#if alternate water is given remove the prefix of the A marked HOH
+
+			$_ = substr($_,0,16)." ".substr($_,17,10000);
+			$number = substr($_,22,4);
+			$chain = substr($_,21,1);
+			if($oldChain ne $chain){
+				$cnt = 0;
+				$oldChain = $chain;
+			}
+			if($number != $old){
+				$cnt++;
+			}
+			#print $number."\n";
+			$number = $number + $offset;
+			#print $number."\n";
+			
+			if($swRen == 1){
+				$number2 = sprintf("%4i",$cnt);
+				$_ = substr($_,0,22).$number2.substr($_,26);
+			}
+			else{
+				$number = sprintf("%4i",$number);
+				$_ = substr($_,0,22).$number.substr($_,26);
+			}
+			
+			if($swRenA == 1){
+				$number3 = sprintf("%5i",$atomCnt);
+				$_ = substr($_,0,6).$number3.substr($_,11);
+
+			}
+			
+			if($swChain == 1){
+				if($chain eq "#"){
+					$chain = " ";
+				}
+				$_ = substr($_,0,21).$chain.substr($_,22);
+			}
+			
+			
+			$resNr = substr($_,22,4);
+			$resNr =~s/\s+//g;
+			$resName = substr($_,17,3);
+			$resName =~ s/\s+//g;
+			$atomType = substr($_,12,4);
+			$atomType =~s/\s+//g;
+			if(/^ATOM/){
+				if($atomType =~m/^[0-9]/){
+					$newAT = $atomType;
+				}
+				else{
+					$newAT = " ".$atomType;
+				}
+				$run = 4-length($newAT);
+				for($g = 0; $g < $run; $g++){
+					$newAT .= " ";
+				}
+				#print "OLD $_";
+				$tmpSub = substr($_,16);
+				$tmpSub =~s/^ //g;
+				$_ = substr($_,0,12).$newAT." ".$tmpSub;
+				#print "|$tmpSub|\n";
+				#print "|$atomType|"."|$newAT|\n";
+				#print "NEW $_";
+			}
+			if($resName =~ m/DT|DA|DG|DC/){
+			       push(@dna,$_);
+			       $lastPrint = $_;
+			       goto END;
+			}
+			
+			####flush the residues and make sure there is no BB atom missing####
+			if($resNr != $oldRes && $oldRes != -999999999999){
+				if($bbn == 4){
+					@tmp = split/\n/,$buffer;
+					foreach $value (@tmp){
+						#print "**$value\n";
+						push(@pdb,"$value\n");
+					}
+					$bbn = 0;
+					$buffer = "";
+				}
+				else{
+					#@tmp = split/\n/,$buffer;
+					#foreach $value (@tmp){
+					#	print "***$value\n";
+					#	#push(@pdb,"$value\n");
+					#}
+					$bbn = 0;
+					$buffer = "";
+				}
+			
+			}
+			####flush the residues and make sure there is no BB atom missing####
+			
+
+			
+			if($swSolv == 1){
+				#$resName = substr($_,17,3);
+				#$resName =~ s/\s+//g;
+				#print "|$resName|\n";
+				 if(defined $tto{$resName}){
+				 	 #aminoacid
+				 	 $buffer .= $_;
+				 	 if(defined $bbatom{$atomType}){
+				 		 $bbn++;
+				 	 }
+					 $lastPrint = $_;
+				 
+				 }
+			
+			}
+			elsif($noHOH == 1){
+				if(defined $tto{$resName}){
+					#aminoacid
+					$buffer .= $_;
+					if(defined $bbatom{$atomType}){
+						$bbn++;
+					}					
+				}
+				elsif(substr($_,17,3) ne "HOH"){
+					if(defined @dna){
+						if($lastPrint !~ m/^TER/){
+							push(@pdb,"TER\n");
+						}
+						push(@pdb,@dna);
+						push(@pdb,"TER\n");
+						$lastPrint = "TER";
+						undef @dna;
+					}
+				
+					#something else
+					#print "**$_";
+					push(@pdb,$_);
+				}
+				$lastPrint = $_;
+			}
+			else{
+				if(defined $tto{$resName}){
+					#aminoacid
+					$buffer .= $_;
+					if(defined $bbatom{$atomType}){
+						$bbn++;
+					}					
+				}
+				else{
+					if(defined @dna){
+						if($lastPrint !~ m/^TER/){
+							push(@pdb,"TER\n");
+						}
+						push(@pdb,@dna);
+						push(@pdb,"TER\n");
+						$lastPrint = "TER";
+						undef @dna;
+					}
+				
+					#something else
+					#print "**$_";
+					push(@pdb,$_);
+				}
+				$lastPrint = $_;
+			}
+			
+
+			
+			$oldRes = $resNr;
+			$old = $number;
+		}
+		$atomCnt++;
+	}
+	elsif(/^TER/ && !($lastPrint =~ m/TER/)){
+		####flush the residues and make sure there is no BB atom missing####
+		if($buffer ne ""){
+			if($bbn == 4){
+				@tmp = split/\n/,$buffer;
+				foreach $value (@tmp){
+					#print "**$value\n";
+					push(@pdb,"$value\n");
+				}
+				$bbn = 0;
+				$buffer = "";
+			}
+	
+		}
+		####flush the residues and make sure there is no BB atom missing####
+		
+		push(@pdb,"TER\n");
+		if(defined @dna && $swSolv == 0){
+			push(@pdb,@dna);
+			push(@pdb,"TER\n");
+			undef @dna;
+		}
+		$lastPrint = "TER";
+		
+	}
+	elsif(/^HEADER/ || /^TITLE/ || /^CRYST/ || /^MODEL/ || /^REMARK/ || /ENDMDL/){
+		push(@pdb,$_);
+	}
+	END:
+}
+#print "|$buffer|\n";
+if($buffer ne ""){
+	if($bbn == 4){
+		@tmp = split/\n/,$buffer;
+		foreach $value (@tmp){
+			#print "**$value\n";
+			push(@pdb,"$value\n");
+		}
+		$bbn = 0;
+		$buffer = "";
+	}
+}
+if($lastPrint ne "TER"){push(@pdb,"TER\n");}
+close FILE;
+
+if($swDNA == 1){
+	&printDNA;
+	exit;
+}
+
+if(defined $bfcutoff){
+	&strWater;
+	exit;
+}
+
+if($swSEQ == 1){
+	&getSEQ;
+	exit;
+}
+
+
+if($swcleans == 1){
+	&cleanSol;
+}
+####print the final output####
+&printPDB;
+####print the final output####
+
+
+
+sub printHelp{
+        print STDERR "USAGE:    repairPDB <PDB FILE> [<RANGE>] [<CHAIN:] [<CHAIN:RANGE>] [OPTIONS]\n";
+	print STDERR "OPTIONS:  [-offset value] offset the residue numbering\n";
+	print STDERR "          [-chain char]   change Chain ID\n";
+	print STDERR "          [-ratom]        renumber Atoms\n";
+	print STDERR "          [-rres]         renumber Residues\n";
+	print STDERR "          [-noh]          remove hydrogens\n";
+	print STDERR "          [-het]          do not change HETATM to ATOM for AA\n";
+	print STDERR "          [-seq]          protein sequence from AA\n";
+	print STDERR "          [-seqrs]        protein sequence from SEQRES entries\n\n";
+		
+	print STDERR "          [-jprot]        just Protein OR\n";
+	print STDERR "          [-nohoh]        no water OR\n";
+	print STDERR "          [-ssw cutoff]   print only waters with B-value below cutoff OR\n";
+	print STDERR "          [-cleansol]     remove overlapping solvent for GROMACS\n\n";
+	
+	print STDERR "          [-dna]          print DNA only OR\n";
+	print STDERR "          [-nodna]        do not print DNA\n";
+
+        exit(1);
+}
+
+sub printPDB{
+	$ter = "";
+	$cntm = 0;
+	foreach $key (@pdb){
+		if($key =~ m/^TER/){
+			if($ter eq "" && $cntm > 0){
+				print $key;
+				$ter = $key;
+			}
+		}
+		elsif($key =~ m/^ATOM/ || $key =~ m/^HETATM/){
+			#print "*$key";
+			$chain = substr($key,21,1);
+			$atType = substr($key,12,4);
+			$resName = substr($key,17,3);
+			$resName =~ s/\s+//g;
+			#if the chain is found in the selection or no chain is excluded
+			if(defined $chains{$chain} || defined $selection{$chain} || not %chains){
+				#if a start and ending point is defined or a chain and we are not looking at DNA				
+				if((((defined $start && defined $end) || defined $selection{$chain}) && defined $tto{$resName} ) && ! $myDNA{$resName}){
+					$resNr = substr($key,22,4);
+					$resNr =~s/\s+//g;
+					if(defined $selection{$chain}){
+						$start1 = (split/\-/,$selection{$chain})[0];
+						$end1 = (split/\-/,$selection{$chain})[1];
+						if($resNr >= $start1 && $resNr <= $end1){
+							if($swNOH == 1){
+								if(substr($atType,0,1) eq " " && substr($atType,1,1) ne "H"){
+									print $key;
+									$ter = "";
+									$cntm++;
+								}
+							}
+							else{
+								print $key;
+								$ter = "";
+								$cntm++;
+							}
+						}			
+					}
+					elsif($resNr >= $start && $resNr <= $end){
+						if($swNOH == 1){
+							if(substr($atType,0,1) eq " " && substr($atType,1,1) ne "H"){
+								print $key;
+								$ter = "";
+								$cntm++;
+							}
+						}
+						else{
+							print $key;
+							$ter = "";
+							$cntm++;
+						}
+					}				
+				}
+				#if no start or ending point and no chain has been defined or it is DNA
+				else{
+					#print "|$atType $resName|\n";
+					if($resName =~ m/^D[A,T,G,C]/ && not defined $tto{$resName}){
+						if($noDNA == 0){
+							print $key;
+							$ter = "";
+							$cntm++;
+						}
+					}
+					elsif((substr($atType,0,1) eq " " && substr($atType,1,1) eq "H")){
+						if($swNOH == 0){
+							print $key;
+							$ter = "";
+							$cntm++;
+						}
+					}
+					else{
+						if(not $myDNA{$resName}){
+							print $key;
+							$ter = "";
+							$cntm++;
+						}
+					}				
+				}
+				
+			}
+		}
+		else{print $key;}
+		#$cntm++;
+	}
+	if($swcleans == 1){
+		print "REMARK RM $removed\n";
+	}
+}
+
+sub getSEQ{
+	$seq = "";
+	foreach $value (@pdb){
+		if($value =~ m/^ATOM/ || $value =~ m/^HETATM/){
+			$chain = substr($value,21,1);
+			$resName = substr($value,17,3);
+			$resName =~ s/\s+//g;
+			$resNr = substr($value,22,4);
+			$resNr =~s/\s+//g;
+			if(defined $chains{$chain} || not %chains){
+				if(defined $start && defined $end){
+
+					if($resNr >= $start && $resNr <= $end){
+						if(defined $tto{$resName} && not defined $mySeq{$chain}{$resNr}){
+							$mySeq{$chain}{$resNr} = $tto{$resName};
+							$seq .= $tto{$resName};
+						}
+					}				
+				}
+				else{
+					if(defined $tto{$resName} && not defined $mySeq{$chain}{$resNr}){
+							$mySeq{$chain}{$resNr} = $tto{$resName};
+						$seq .= $tto{$resName};
+					}
+				}
+
+			}
+			
+		}
+	}
+	print "$seq\n";
+}
+
+sub getSQRS{
+	open(PDB,$ARGV[0]);
+	$seq = "";
+	while(<PDB>){
+		chomp($_);
+		$seqres = "";
+		if(/^SEQRES/){
+			if(defined $ARGV[1]){
+				if(defined $chains{substr($_,11,1)} || not %chains){
+					$seqres = $_;
+					#print "$_\n";
+				}
+			}
+			else{
+				#print "$_\n";
+				$seqres = $_;
+			}
+			@tmp = split/\s+/,$seqres;
+			foreach $val (@tmp){
+				if(defined $tto{$val}){
+					$seq .= $tto{$val};
+				#print "$tto{$val}\n";
+				}
+			}
+		}
+	}
+	close PDB;
+	print "$seq\n";
+}
+
+sub cleanSol{
+	$oldResNR = -999999;
+	$buffer = "";
+	$removed = 0;
+	foreach $value (@pdb){
+		#print "1 $value";
+		chomp($value);
+		if($value=~m/^ATOM/ || $value=~m/^HETATM/){
+			$resName = substr($value,17,3);
+			$resName =~ s/\s+//g;
+			$atomName = substr($value,12,4);
+			$atomName =~ s/\s+//g;
+
+			if($resName eq "SOL"){
+				$resNR = substr($value,22,4);
+				$resNR =~ s/\s+//g;
+				if($resNR != $oldResNR && $oldResNR != -999999){
+					$nr = keys %check;
+					if($nr == 3 && $memory{$owCoord} == 1){
+						@tmp = split/\n/,$buffer;
+						foreach $val (@tmp){
+							push(@tmppdb,"$val\n");
+						}
+					}
+				else{$removed++;}
+					undef %check;
+					$buffer = "";
+				}
+				$xCoord = substr($value,30,8);
+				$xCoord =~ s/\s+//g;
+				$yCoord = substr($value,38,8);
+				$yCoord =~ s/\s+//g;
+				$zCoord = substr($value,46,8);
+				$zCoord =~ s/\s+//g;
+				$coord = "$xCoord\_$yCoord\_$zCoord";
+						
+				$check{$coord}++;
+				if($atomName eq "OW"){
+					$memory{$coord}++;
+					if(not defined $resolve{$coord}){
+						$resolve{$coord} = $resNR;
+					}
+					$owCoord = $coord;
+				}
+				$buffer .= "$value\n";
+				$oldResNR = $resNR;
+			}
+			else{
+				if($buffer ne ""){
+					$nr = keys %check;
+					if($nr == 3 && $memory{$owCoord} == 1){
+						@tmp = split/\n/,$buffer;
+						foreach $val (@tmp){
+							push(@tmppdb,"$val\n");
+						}
+					}
+					else{$removed++;}
+					undef %check;
+					$buffer = "";
+				}
+				push(@tmppdb,"$value\n");
+
+			}
+		}
+		
+		else{
+			if($buffer ne ""){
+				$nr = keys %check;
+				if($nr == 3 && $memory{$owCoord} == 1){
+					@tmp = split/\n/,$buffer;
+					foreach $val (@tmp){
+						push(@tmppdb,"$val\n");
+					}
+				}
+				else{$removed++;}
+				undef %check;
+				$buffer = "";
+			}
+			push(@tmppdb,"$value\n");
+
+		}
+	}
+	
+	if($buffer ne ""){
+		#print "||$buffer||";
+		$nr = keys %check;
+		if($nr == 3 && $memory{$owCoord} == 1){
+			@tmp = split/\n/,$buffer;
+			foreach $val (@tmp){
+				push(@tmppdb,"$val\n");
+			}
+		}
+		else{$removed++;}
+		undef %check;
+		$buffer = "";
+	}
+	@pdb = @tmppdb;
+
+}
+
+sub strWater{
+	$oldTer = 1;
+	foreach $value (@pdb){
+		#print $value;
+		chomp($value);
+		#print "|$value|\n";
+
+		if($value =~ m/^HETATM/){
+			#print "yes hetatom\n";
+			$type = substr($value,17,3);
+			if($type eq "HOH"){
+				$bfac = substr($value,60,5);
+				#print "yes hoh $bfac $bfcutoff\n";
+
+				if ($bfac < $bfcutoff){
+					$mchain = substr($value,21,1);
+					#print "|$mchain|\n";
+					if(%chains || %selection){
+						if(defined $chains{$mchain} || defined $selection{$mchain}){
+							print $value."\n";
+							$oldTer = 0;
+						}
+					}
+					else{
+						print $value."\n";
+						$oldTer = 0;
+					}
+				}
+			}
+		}
+		elsif($value =~ m/^TER/ && $oldTer != 1){
+			print $value."\n";
+			$oldTer = 1;
+		}
+	}	
+
+}
+
+sub printDNA{
+	$oldTer = 1;
+	foreach $value (@pdb){
+		chomp($value);
+		$type = "";
+		#print "|$value|\n";
+		if($value =~ m/^HETATM/ || $value =~ m/^ATOM/){
+			#print "yes hetatom\n";
+			$type = substr($value,17,3);
+			$type =~ s/\s+//g;
+			if($myDNA{$type}){
+				print $value."\n";
+				$oldTer = 0;
+			}
+		}
+		elsif($value =~ m/^TER/ && $oldTer != 1){
+			print $value."\n";
+			$oldTer = 1;
+		}
+	}
+}
