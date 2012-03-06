@@ -108,6 +108,7 @@ $threads = 1;
 $path = $ENV{'HOME'}."/projects/md";
 $pathGromacs = "";
 $pathScwrl = "";
+$pathScripts = "";
 
 # Get parameters (PDB file and number of nodes):
 if(not defined $ARGV[0]){
@@ -209,6 +210,15 @@ for($i = 0; $i < @ARGV; $i++){
 			exit(1);
 		}
 	}
+	elsif($key eq "--scriptpath"){
+		if(defined $ARGV[$i+1] && -e "$ARGV[$i+1]"){
+			$pathScripts = $ARGV[$i+1];
+		}
+		else{
+			print STDERR "$ARGV[$i+1] is not a valid path!\n";
+			exit(1);
+		}
+	}
 	elsif($key =~m /([a-z,0-9]\:)+/){
 		$key = uc($key);
 		$key =~ s/\://g;
@@ -282,6 +292,9 @@ $rlMD   = $lengthMD/$stepsize;
 ###############################################################################
 if($pathGromacs ne ""){
 	$ENV{PATH} .= ":$pathGromacs";
+}
+if($pathScripts ne ""){
+	$ENV{PATH} .= ":$pathScripts";
 }
 $check = `which pdb2gmx`;
 chomp($check);
@@ -1266,8 +1279,10 @@ sub printHelp{
 	print STDERR "          [-cutoffSTRW int]	cutoff in A for structural water to keep (15)\n\n";
 	
 	print STDERR "          [--gromacsPATH PATH] 	path to gromacs distribution\n";
-	print STDERR "          [--scwrlPATH PATH]   	path to scwrl distribution\n\n";
+	print STDERR "          [--scwrlPATH PATH]   	path to scwrl distribution\n";
+	print STDERR "          [--scriptPATH PATH]   path to helper scripts needed\n\n";
+
 	
-	print STDERR "          [--jp] 	                just prepare structure for GROMACS\n";
+	print STDERR "          [--jp]                just prepare structure for GROMACS\n";
         exit(1);
 }
