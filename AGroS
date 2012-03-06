@@ -229,6 +229,37 @@ for($i = 0; $i < @ARGV; $i++){
 	}	
 }
 
+
+##############
+##  DEFENV  ##
+###############################################################################
+if($pathGromacs ne ""){
+	$ENV{PATH} .= ":$pathGromacs";
+}
+if($pathScripts ne ""){
+	$ENV{PATH} .= ":$pathScripts";
+}
+if($pathScwrl ne ""){
+	$ENV{PATH} .= ":$pathScwrl";
+}
+$check = `which pdb2gmx`;
+chomp($check);
+if($check eq ""){
+	print "Could not find the gromacs binaries; please define in PATH or commandline!\n";
+	exit(1);
+}
+if($scwrl == 1){
+	$check = `which scwrl`;
+	chomp($check);
+	if($check eq ""){
+		print "Could not find the scwrl binary; please define in PATH or commandline!\n";
+		exit(1);
+	}
+}
+###############################################################################
+
+
+
 if (defined $ENV{'LRZ_SYSTEM'}){
 	$scwrl = 0;
 	print "WE ARE ON THE LRZ, RIGHT?\n";
@@ -287,41 +318,12 @@ $rlNVPT = $lengthNVPT/$stepsize;
 $rlMD   = $lengthMD/$stepsize;
 ###############################################################################
 
-##############
-##  DEFENV  ##
-###############################################################################
-if($pathGromacs ne ""){
-	$ENV{PATH} .= ":$pathGromacs";
-}
-if($pathScripts ne ""){
-	$ENV{PATH} .= ":$pathScripts";
-}
-$check = `which pdb2gmx`;
-chomp($check);
-if($check eq ""){
-	print "Could not find the gromacs binaries; please define in PATH or commandline!\n";
-	exit(1);
-}
-
-if($pathScwrl ne ""){
-	$ENV{PATH} .= ":$pathScwrl";
-}
-if($scwrl == 1){
-	$check = `which scwrl`;
-	chomp($check);
-	if($check eq ""){
-		print "Could not find the scwrl binary; please define in PATH or commandline!\n";
-		exit(1);
-	}
-}
-
-###############################################################################
 
 #PRINT SETTINGS###################################################################
 print "Your settings are:\n";
 print "------------------------------------------------------------------------------\n";
 print "$input\n";
-if(defined %chains){
+if(%chains){
 	$chainSTR = "";
 	foreach $key(sort keys %chains){
 		$chainSTR .= "$key: ";
@@ -367,7 +369,7 @@ my @abbr = qw( Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec );
 $log_out = "$path/mdrun_$root/$root.stdout";
 $log_err = "$path/mdrun_$root/$root.stderr";
 
-if(defined %chains){
+if(%chains){
 	$chainSTR = "";
 	foreach $key(sort keys %chains){
 		$chainSTR .= "$key: ";
