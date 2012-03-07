@@ -16,10 +16,10 @@ to fully use this script:
    A good instruction is found at:
    http://www.gromacs.org/Documentation/Installation_Instructions
    
-   In order to run GROMACS efficiently you need the following additonal
+   In order to run GROMACS efficiently you need the following additional
    packages:
    - FFTW: http://www.fftw.org/
-   - Some kind of MPI to run GROMACS in parallel - this is REALLY importan
+   - Some kind of MPI to run GROMACS in parallel - this is REALLY important
      otherwise you will have to wait forever until you get reasonable results
      Your MPI command should either be MPIRUN or MPIEXEC. Otherwise you will 
      have to change the $call variable within the script.
@@ -40,7 +40,7 @@ to fully use this script:
    The same applies to "gunzip" and the shell "bash" should be installed
    and used.
    
-These are the commanline options:
+These are the commandline options:
 
 USAGE:    AGroS <PDB FILE | PDB CODE> [<CHAIN: ...>] [OPTIONS]
 OPTIONS:  [-dir PATH] 		directory to save results to
@@ -74,7 +74,20 @@ chosen($HOME/projects/md).
 Finally, if you want to change more specific things such as solvent, boxes, 
 thermostats, barostats or others, you will need to hack the scripts.
 
-GOOD LUCK AND HAVE FUN!
 
-
-
+SOME FACTS 
+--------------------------------------------------------------------------------
+- Forcefield used: AMBER03
+- Water model: TIP3P
+- For protein only VSITES -> step size 5fs
+- For protein/DNA no VSITES -> step size 2fs
+- Boxtype: Dodecahedron with distance 10A
+- Ions (NA/CL) concentration 0.1
+- Minimization of solvent with fixed protein, using SD for 5000 steps
+- Minimization of solvent and sidechains with fixed backbone, using SD for 5000 
+  steps
+- Minimization of solvent and sidechains with fixed backbone, using CG for 5000 
+  steps
+- NVT for 50 ps, thermostat: v-rescale, temperature = 298K
+- NPT for 50 ps, thermostat: v-rescale, barostat: berendsen, temperature = 298K
+- Production for 10 ns, settings as for NPT
