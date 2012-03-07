@@ -547,10 +547,10 @@ if(! -e "$path/mdrun_$root/$root.gro" || ! -e "$path/mdrun_$root/$root.top"){
 	# - Option vsite hydrogens in pdb2gmx speeds up the MD protocol.
 	# - Create top and charge file.
 	if($dna == 0){
-		`pdb2gmx -f $path/mdrun_$root/$root\_nh.pdb -o $path/mdrun_$root/$root.gro -p $path/mdrun_$root/$root.top -water tip3p -ff amber03 -vsite hydrogens -chainsep id_or_ter 2>$log_err 1>$log_out`;
+		`pdb2gmx -f $path/mdrun_$root/$root\_nh.pdb -o $path/mdrun_$root/$root.gro -p $path/mdrun_$root/$root.top -water tip3p -ff amber03 -vsite hydrogens -chainsep id_or_ter 2>>$log_err 1>>$log_out`;
 	}
 	else{
-		`pdb2gmx -f $path/mdrun_$root/$root\_nh.pdb -o $path/mdrun_$root/$root.gro -p $path/mdrun_$root/$root.top -water tip3p -ff amber03 -chainsep id_or_ter  2>$log_err 1>$log_out`;
+		`pdb2gmx -f $path/mdrun_$root/$root\_nh.pdb -o $path/mdrun_$root/$root.gro -p $path/mdrun_$root/$root.top -water tip3p -ff amber03 -chainsep id_or_ter  2>>$log_err 1>>$log_out`;
 	}
 }
 if(! -e "$path/mdrun_$root/$root.gro" || ! -e "$path/mdrun_$root/$root.top"){
