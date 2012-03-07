@@ -1,1 +1,48 @@
-/apps/scripts/script_repo/fetchpdb
+#!/usr/bin/perl -w
+use CGI ':standard';
+use CGI::Carp qw(fatalsToBrowser);
+
+###############
+##   Title   ##
+###############################################################################
+
+my $header = <<'EOHEADER';
+------------------------------------------------------------------------------
+		                  fetchpdb		      
+------------------------------------------------------------------------------					      
+ A script to fetch PDB structure from the RCSB repository using the PDB id.
+ 									      
+		     Authors: (C) Marc Offman				      
+			       Date: 05.03.2012 			      
+			       Version: 1				      
+									      
+									      
+			  Thank you for using fetchpdb!			      
+	    Any questions should be adressed to offman@rostlab.org	      
+									      
+------------------------------------------------------------------------------
+
+EOHEADER
+
+
+if(not defined $ARGV[0]){
+	print "USAGE: fetchPDB <4 LETTER PDB CODE>\n";
+	exit;
+}
+
+if(length($ARGV[0]) != 4 || ! substr($ARGV[0],0,1)=~m/[0-9]/){
+	print "ERROR: This is not a valid PDB code!\n";
+	exit;
+}
+
+$file_fetch = "http://www.rcsb.org/pdb/cgi/export.cgi/$ARGV[0].pdb.gz?format=PDB&pdbId=$ARGV[0]&compression=gz";
+
+`bash -c 'wget -q $file_fetch 2>&1 /dev/null'`;
+if(! -e "$ARGV[0].pdb.gz\?format\=PDB"){
+	print "ERROR: Can't download PDB!\n";
+	exit;
+
+}
+`/bin/mv $ARGV[0].pdb.gz\?format\=PDB $ARGV[0].pdb.gz`;
+`gunzip -f $ARGV[0].pdb.gz`;
+`/bin/rm -f $ARGV[0].pdb.gz\?format\=PDB*`;
