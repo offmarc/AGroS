@@ -261,7 +261,7 @@ if($scwrl == 1){
 
 
 if (defined $ENV{'LRZ_SYSTEM'}){
-	$scwrl = 0;
+	#$scwrl = 0;
 	print "WE ARE ON THE LRZ, RIGHT?\n";
 }
 #Figure which mpi to use
