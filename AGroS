@@ -9,7 +9,7 @@ system('stty iutf8');
 my $header = <<'EOHEADER';
 ------------------------------------------------------------------------------
 		     AGroS - Automatic Gromacs Simulations		      
-------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 									      
  AGroS is a script package to allow easy setup and run of MD simulation using
  GROMACS. The input is a pdb file or pdb identifier. Single or multiple chain
@@ -1215,8 +1215,8 @@ if(! -e "$path/mdrun_$root/md.mdp"){
 	print OUT "constraints		= all-bonds\n";
 	print OUT "constraint-algorithm = Lincs\n";
 	print OUT "unconstrained-start	= yes\n";
-	print OUT "lincs-order		= 4\n";
-	print OUT "lincs-iter		= 1\n";
+	print OUT "lincs-order		= 6\n";
+	print OUT "lincs-iter		= 2\n";
 	print OUT "lincs-warnangle	= 30\n";
 	#print OUT "comm_mode		= linear\n";
 	close OUT;
