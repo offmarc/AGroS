@@ -15,8 +15,8 @@ my $header = <<'EOHEADER';
 									      
 									      
 		     Authors: (C) Marc Offman				      
-			       Date: 20.06.2012 			      
-			       Version: 1.1				      
+			       Date: 18.07.2012 			      
+			       Version: 1.12				      
 									      
 									      
 			  Thank you for using repairPDB!			      
@@ -51,7 +51,7 @@ $noHOH = 0;
 @tlaa = ("ALA","CYS","ASP","GLU","PHE","GLY","HIS","ILE","LYS","LEU","MET","ASN","PRO","GLN","ARG","SER","THR","VAL","TRP","TYR","ASX","GLX","ACE","UNK");
 %bbatom = ("N"=>1,"CA"=>1,"C"=>1,"O"=>1, "OC1"=>1);
 #%AAatom = ("N"=>1,"CA"=>1,"C"=>1,"O"=>1,"CB"=>1, "CG"=>1, "CG1"=>1, "CG2"=>1, "SG"=>1, "OG"=>1, "OG1"=>1, "CD"=>1, "CD1"=>1, "CD2"=>1, "OD1"=>1,"OD2"=>1, "ND1"=>1, "ND2"=>1, "SD"=>1, "NE"=>1, "NE1"=>1, "NE2"=>1, "SE"=>1, "OE1"=>1, "OE1"=>2, "CE"=>1,"CE1"=>1, "CE2"=>1, "CZ"=>1, "NZ"=>1);
-%myDNA = ("DT"=>1,"DC"=>1,"DG"=>1,"DA"=>1);
+%myDNA = ("DT"=>1,"DC"=>1,"DG"=>1,"DA"=>1, "THY"=>1, "GUA"=>1, "ADE"=>1, "CYT"=> 1);
 
 for($i = 0; $i < @slaa; $i++){
 	$tto{$tlaa[$i]} = $slaa[$i];
@@ -233,6 +233,13 @@ while(<FILE>){
 			if($oldChain ne $chain){
 				$cnt = 0;
 				$oldChain = $chain;
+				#print "LP |$lastPrint|\n";
+				
+				#Deal with cases where no TER tag is found between differing chains and add
+				#if($lastPrint !~ m/^TER/){
+				#	push(@pdb,"TER\n");
+				#}
+		
 			}
 			if($number != $old){
 				$cnt++;
@@ -241,6 +248,7 @@ while(<FILE>){
 			$number = $number + $offset;
 			#print $number."\n";
 			
+			#deal with Residue numbering
 			if($swRen == 1){
 				$number2 = sprintf("%4i",$cnt);
 				$_ = substr($_,0,22).$number2.substr($_,26);
@@ -250,12 +258,14 @@ while(<FILE>){
 				$_ = substr($_,0,22).$number.substr($_,26);
 			}
 			
+			#deal with Atom numbering
 			if($swRenA == 1){
 				$number3 = sprintf("%5i",$atomCnt);
 				$_ = substr($_,0,6).$number3.substr($_,11);
 
 			}
 			
+			#deal with Chain ID
 			if($swChain == 1){
 				if($chain eq "#"){
 					$chain = " ";
@@ -270,8 +280,11 @@ while(<FILE>){
 			$resName =~ s/\s+//g;
 			$atomType = substr($_,12,4);
 			$atomType =~s/\s+//g;
+			
 			if(/^ATOM/){
-				if($atomType =~m/^[0-9]/){
+				#make sure that the Atom IDs are correctly place in the column scheme of PDB, 
+				#strange exceptions such as hydrogens need to be checked explicitly
+				if($atomType =~m/^[0-9]/ || length($atomType) == 4){
 					$newAT = $atomType;
 				}
 				else{
@@ -289,8 +302,23 @@ while(<FILE>){
 				#print "|$atomType|"."|$newAT|\n";
 				#print "NEW $_";
 			}
-			if($resName =~ m/DT|DA|DG|DC/){
-			       push(@dna,$_);
+			#extract DNA
+			if(defined $myDNA{$resName}){
+				$HCheck = substr($_,12,2);
+				#lets deal with the dna inconsistencies
+				$_ =~ s/THY/ DT/;
+				$_ =~ s/CYT/ DC/;
+				$_ =~ s/ADE/ DA/;
+				$_ =~ s/GUA/ DG/;
+
+				#first lets get rid of hydrogens to clean this up a bit - at the moment i don't to give this as an option!
+				if($swNOH == 1 && $HCheck !~ m/^(H[0-9]| H)/){
+					push(@dna,$_);
+				}
+				elsif($swNOH == 0){
+					push(@dna,$_);
+				}
+			       #print "here DNA $_\n";
 			       $lastPrint = $_;
 			       goto END;
 			}
@@ -320,7 +348,7 @@ while(<FILE>){
 			####flush the residues and make sure there is no BB atom missing####
 			
 
-			
+			#only protein?
 			if($swSolv == 1){
 				#$resName = substr($_,17,3);
 				#$resName =~ s/\s+//g;
@@ -336,6 +364,7 @@ while(<FILE>){
 				 }
 			
 			}
+			#no water molecules
 			elsif($noHOH == 1){
 				if(defined $tto{$resName}){
 					#aminoacid
@@ -411,6 +440,7 @@ while(<FILE>){
 		####flush the residues and make sure there is no BB atom missing####
 		
 		push(@pdb,"TER\n");
+		#print "@dna\n";
 		if(defined @dna && $swSolv == 0){
 			push(@pdb,@dna);
 			push(@pdb,"TER\n");
@@ -436,6 +466,18 @@ if($buffer ne ""){
 		$buffer = "";
 	}
 }
+
+#somebody has DNA in the file and no TERs - not good!
+if(defined @dna && $swSolv == 0){
+	if($lastPrint ne "TER"){push(@pdb,"TER\n");}
+	push(@pdb,@dna);
+	push(@pdb,"TER\n");
+	undef @dna;
+	$lastPrint = "TER";
+}
+
+
+#Is there really a final TER?
 if($lastPrint ne "TER"){push(@pdb,"TER\n");}
 close FILE;
 
@@ -499,21 +541,27 @@ sub printPDB{
 		elsif($key =~ m/^ATOM/ || $key =~ m/^HETATM/){
 			#print "*$key";
 			$chain = substr($key,21,1);
-			$atType = substr($key,12,4);
+			#$atType = substr($key,12,4);
 			$resName = substr($key,17,3);
 			$resName =~ s/\s+//g;
+			$HCheck = substr($key,12,2);
 			#if the chain is found in the selection or no chain is excluded
 			if(defined $chains{$chain} || defined $selection{$chain} || not %chains){
 				#if a start and ending point is defined or a chain and we are not looking at DNA				
 				if((((defined $start && defined $end) || defined $selection{$chain}) && defined $tto{$resName} ) && ! $myDNA{$resName}){
 					$resNr = substr($key,22,4);
 					$resNr =~s/\s+//g;
+					#defined chain and maybe range
 					if(defined $selection{$chain}){
 						$start1 = (split/\-/,$selection{$chain})[0];
 						$end1 = (split/\-/,$selection{$chain})[1];
 						if($resNr >= $start1 && $resNr <= $end1){
 							if($swNOH == 1){
-								if((substr($atType,0,1) eq " " || substr($atType,0,1) eq "1" || substr($atType,0,1) eq "2" || substr($atType,0,1) eq "3") && substr($atType,1,1) ne "H"){
+								#like in scwrl: |1H**|,|2H**|, |3H**|, | H**|; NMR: /H***/; Gromacs stuff same but instead of H it can be M for special atoms
+								#/^(([H,M][0-9,A-Z]+)|([1-3, ][H,M]))
+								#here it is clear that we do not want hydrogens and we check for all non-matching types
+								#if((substr($atType,0,1) eq " " || substr($atType,0,1) eq "1" || substr($atType,0,1) eq "2" || substr($atType,0,1) eq "3") && substr($atType,1,1) ne "H"){
+								if($HCheck !~ m/^(([H,M][0-9,A-Z]+)|([1-3, ][H,M]))/){
 									print $key;
 									$ter = "";
 									$cntm++;
@@ -526,9 +574,12 @@ sub printPDB{
 							}
 						}			
 					}
+					#no chain defined but range
 					elsif($resNr >= $start && $resNr <= $end){
 						if($swNOH == 1){
-							if((substr($atType,0,1) eq " " || substr($atType,0,1) eq "1" || substr($atType,0,1) eq "2" || substr($atType,0,1) eq "3") && substr($atType,1,1) ne "H"){
+							#here it is clear that we do not wanr hydrogens and we check for all non-matching types
+							#if((substr($atType,0,1) eq " " || substr($atType,0,1) eq "1" || substr($atType,0,1) eq "2" || substr($atType,0,1) eq "3") && substr($atType,1,1) ne "H"){
+							if($HCheck !~ m/^(([H,M][0-9,A-Z]+)|([1-3, ][H,M]))/){
 								print $key;
 								$ter = "";
 								$cntm++;
@@ -544,14 +595,16 @@ sub printPDB{
 				#if no start or ending point and no chain has been defined or it is DNA
 				else{
 					#print "|$atType $resName|\n";
-					if($resName =~ m/^D[A,T,G,C]/ && not defined $tto{$resName}){
+					if(defined $myDNA{$resName} && not defined $tto{$resName}){
 						if($noDNA == 0){
 							print $key;
 							$ter = "";
 							$cntm++;
 						}
 					}
-					elsif(((substr($atType,0,1) eq " " || substr($atType,0,1) eq "1" || substr($atType,0,1) eq "2" || substr($atType,0,1) eq "3") && substr($atType,1,1) eq "H")){
+					#here we identify water and if we do not want it we simply do not print it...
+					#elsif(((substr($atType,0,1) eq " " || substr($atType,0,1) eq "1" || substr($atType,0,1) eq "2" || substr($atType,0,1) eq "3") && substr($atType,1,1) eq "H")){
+					elsif($HCheck =~ m/^(([H,M][0-9,A-Z]+)|([1-3, ][H,M]))/){
 						if($swNOH == 0){
 							print $key;
 							$ter = "";
@@ -788,6 +841,7 @@ sub printDNA{
 			#print "yes hetatom\n";
 			$type = substr($value,17,3);
 			$type =~ s/\s+//g;
+			#print "|$type|\n";
 			if($myDNA{$type}){
 				print $value."\n";
 				$oldTer = 0;
